@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Today</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--text:#111827;--muted:#6b7280;--accent:#2563eb;--line:#e5e7eb}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
+.app{max-width:720px;margin:auto;padding:env(safe-area-inset-top) 16px calc(28px + env(safe-area-inset-bottom))}
+header{padding:28px 4px 16px;display:flex;justify-content:space-between;align-items:flex-start}
+.eyebrow{font-size:14px;color:var(--muted)}h1{font-size:42px;line-height:1;margin:7px 0}.sub{color:var(--muted);margin:0}
+button{border:0;font:inherit;cursor:pointer}.add{width:48px;height:48px;border-radius:50%;background:var(--accent);color:#fff;font-size:30px;box-shadow:0 6px 18px #2563eb33}
+.card{background:var(--card);border-radius:20px;padding:18px;margin:10px 0 22px;box-shadow:0 1px 3px #0000000b}
+.progress-row{display:flex;justify-content:space-between;font-weight:700}.bar{height:9px;background:#e5e7eb;border-radius:99px;margin:14px 0 8px;overflow:hidden}.fill{height:100%;background:var(--accent);border-radius:99px;width:0;transition:.25s}
+.percent{font-size:13px;color:var(--muted)}
+h2{font-size:19px;margin:20px 4px 9px}.task{background:var(--card);border-radius:15px;padding:14px;display:flex;gap:12px;align-items:center;margin:8px 0;box-shadow:0 1px 3px #0000000b}
+.check{width:27px;height:27px;border:2px solid #cbd5e1;border-radius:50%;background:transparent;color:white;flex:none}.check.done{background:var(--accent);border-color:var(--accent)}.check.done:after{content:"✓";font-weight:800}
+.taskmain{min-width:0;flex:1}.title{font-weight:650}.doneText{text-decoration:line-through;color:var(--muted)}.time{font-size:12px;color:var(--muted);margin-top:3px}.del{color:#9ca3af;background:transparent;font-size:20px}
+.empty{text-align:center;color:var(--muted);padding:30px}
+.modal{position:fixed;inset:0;background:#0006;display:none;align-items:flex-end;z-index:5}.modal.open{display:flex}.sheet{background:var(--card);width:100%;border-radius:24px 24px 0 0;padding:22px max(18px,calc((100vw - 680px)/2)) 35px}
+input,select{width:100%;padding:13px;border:1px solid var(--line);border-radius:12px;font:inherit;background:var(--bg);margin:7px 0 14px}label{font-size:13px;font-weight:650}.actions{display:flex;gap:10px}.actions button{flex:1;padding:14px;border-radius:12px}.primary{background:var(--accent);color:#fff}.secondary{background:var(--bg)}
+.install{display:none;margin:12px 0;padding:12px;border-radius:12px;background:#eaf1ff;color:#174ea6;font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div><div class="eyebrow" id="date"></div><h1>Today</h1><p class="sub">Focus on today, not everything at once.</p></div><button class="add" id="add">+</button></header>
+<div class="install" id="install">For the best iPhone experience, use Safari → Share → Add to Home Screen → Open as Web App.</div>
+<section class="card"><div class="progress-row"><span>Today's progress</span><span id="count">0 / 0</span></div><div class="bar"><div class="fill" id="fill"></div></div><div class="percent" id="percent">0% complete</div></section>
+<main id="list"></main>
+<button id="reset" style="width:100%;padding:13px;border-radius:12px;background:#fff;color:#4b5563;margin-top:10px">Reset today's progress</button>
+</div>
+<div class="modal" id="modal"><div class="sheet">
+<h2 style="margin-top:0">New Task</h2>
+<label>Task</label><input id="title" placeholder="What do you need to do?">
+<label>Category</label><select id="category"><option>Morning</option><option>Career</option><option>Personal</option><option>Evening</option></select>
+<label>Reminder</label><input id="time" type="time">
+<label><input id="repeat" type="checkbox" checked style="width:auto;margin-right:8px"> Repeat daily</label>
+<div class="actions"><button class="secondary" id="cancel">Cancel</button><button class="primary" id="save">Add task</button></div>
+</div></div>
+<script>
+const KEY="today_tasks_v1";
+const order=["Morning","Career","Personal","Evening"];
+const defaults=[
+["Wake up","Morning","07:30"],["20 minute walk","Morning","08:30"],["Apply to 3 targeted jobs","Career","10:00"],
+["Java / Spring Boot practice","Career","11:30"],["Contact 2 recruiters","Career","14:00"],["Work on personal project","Career","15:30"],
+["Exercise","Personal","18:00"],["Spend time with family","Personal","19:30"],["Review today's progress","Evening","21:30"],["Plan tomorrow","Evening","21:45"]];
+let tasks=JSON.parse(localStorage.getItem(KEY)||"null")||defaults.map(x=>({id:crypto.randomUUID(),title:x[0],category:x[1],time:x[2],done:false,repeat:true}));
+function save(){localStorage.setItem(KEY,JSON.stringify(tasks))}
+function fmt(t){let [h,m]=t.split(":").map(Number);let d=new Date;d.setHours(h,m);return d.toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}
+function render(){
+ const d=new Date();document.getElementById("date").textContent=d.toLocaleDateString([], {weekday:"long",month:"long",day:"numeric"});
+ const done=tasks.filter(x=>x.done).length, total=tasks.length, pct=total?Math.round(done/total*100):0;
+ document.getElementById("count").textContent=`${done} / ${total}`;document.getElementById("fill").style.width=pct+"%";document.getElementById("percent").textContent=pct+"% complete";
+ const list=document.getElementById("list");list.innerHTML="";
+ if(!tasks.length){list.innerHTML='<div class="empty">No tasks yet. Tap + to add one.</div>';return}
+ order.forEach(cat=>{let group=tasks.filter(x=>x.category===cat).sort((a,b)=>a.time.localeCompare(b.time));if(!group.length)return;
+ let h=document.createElement("h2");h.textContent=cat;list.appendChild(h);
+ group.forEach(t=>{let row=document.createElement("div");row.className="task";
+ row.innerHTML=`<button class="check ${t.done?"done":""}" aria-label="Complete"></button><div class="taskmain"><div class="title ${t.done?"doneText":""}">${esc(t.title)}</div><div class="time">${fmt(t.time)}${t.repeat?" · Daily":""}</div></div><button class="del">×</button>`;
+ row.querySelector(".check").onclick=()=>{t.done=!t.done;save();render()};
+ row.querySelector(".del").onclick=()=>{tasks=tasks.filter(x=>x.id!==t.id);save();render()};
+ list.appendChild(row)})})
+}
+function esc(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+document.getElementById("add").onclick=()=>{document.getElementById("modal").classList.add("open");document.getElementById("time").value=new Date().toTimeString().slice(0,5)}
+document.getElementById("cancel").onclick=()=>document.getElementById("modal").classList.remove("open");
+document.getElementById("save").onclick=async()=>{let title=document.getElementById("title").value.trim();if(!title)return;
+let t={id:crypto.randomUUID(),title,category:document.getElementById("category").value,time:document.getElementById("time").value,done:false,repeat:document.getElementById("repeat").checked};
+tasks.push(t);save();document.getElementById("title").value="";document.getElementById("modal").classList.remove("open");render();
+if("Notification" in window && Notification.permission==="default") await Notification.requestPermission();
+};
+document.getElementById("reset").onclick=()=>{tasks.forEach(t=>t.done=false);save();render()};
+render();
+if(window.matchMedia("(display-mode: standalone)").matches===false) document.getElementById("install").style.display="block";
+</script>
+</body></html>
